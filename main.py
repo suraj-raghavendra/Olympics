@@ -1,17 +1,25 @@
-from pymongo import MongoClient
-
-
-cluster = MongoClient("mongodb+srv://dsci551_group71:Group71DSCI551@cluster0.cembryp.mongodb.net/?retryWrites=true&w=majority")
+import connection
+import sys
 # db = client.test
 
-db = cluster.Olympics
-collection = db["test"]
+password = sys.argv[1]
+if not connection.dbConnection(password):
+    print("Failed to connect")
+else:
+    cluster = connection.dbConnection(password)
+    db = cluster.Olympics
+    collection = db["test"]
 
-document1 = {"_id":2, "college" : "USC"}
-document2 = {"_id":3, "college" : "USC"}
+    DataNode1 = db['DataNode1']
+    DataNode2 = db['DataNode2']
 
-collection.insert_many([document1,document2])
+    document1 = {"_id":4, "college" : "USC"}
+    document2 = {"_id":5, "college" : "USC"}
 
-results = collection.find()
-for result in results:
-    print(result)
+    # collection.insert_many([document1,document2])
+    DataNode2.insert_many([document1,document2])
+    DataNode1.insert_many([document1,document2])
+
+    results = DataNode1.find()
+    for result in results:
+        print(result)
