@@ -1,5 +1,5 @@
 from cmath import e
-from matplotlib.font_manager import json_dump
+from time import sleep
 import requests
 import json
 import sys
@@ -41,7 +41,6 @@ def mkdir(directory):
         PWD = PWD + level + "/"
 
     # show_DB()
-# mkdir("/user/chauhan/mahak")
 
 def cd(directory):
     
@@ -76,32 +75,39 @@ def ls(directory):
         print("")
 
 def createNameNode(filename, path, numPartition):
-    filename = filename[:-4] + "___csv"
+    
     filePath = path + "/" + filename
+
     mkdir(filePath)
 
     #upload file metadata in the namenode
     d = { "k" : numPartition}
+    for i in range(numPartition):
+        d["partition_" + str(i)] = DATANODE + "DataNode_" + str(i)
+    print(d)
     d = json.dumps(d)
-    r = requests.patch(NAMENODE + filePath + ".json", data= d)
+    print(NAMENODE + filePath + ".json")
+    r = requests.patch(NAMENODE + filePath + ".json", data = d)
 
-    createDataNode(filename, numPartition)
+    #Add fileName to each of the DataNodes
+    addFileName(filename, numPartition)
+    print(r.json())
 
 def createDataNode(fileName, numPartition):
 
     r = requests.get(DATANODE + ".json")
-    numberOfDataNodes = len(r.json())
-    if(numberOfDataNodes):
-        if(numberOfDataNodes > numPartition):
-            return
-        else:
-            dataNodeTemplate(numPartition - numberOfDataNodes)
+    if(not r.json()):
+        dataNodeTemplate(numPartition, fileName)
     else:
-        dataNodeTemplate(numPartition)
+        numberOfDataNodes = len(r.json())
+        # print(numberOfDataNodes)
+        if(numberOfDataNodes):
+            if(numberOfDataNodes > numPartition):
+                return
+            else:
+                dataNodeTemplate(numPartition - numberOfDataNodes, fileName)
 
-
-
-def dataNodeTemplate(count):
+def dataNodeTemplate(count, fileName):
     """
     creates the DataNode template;
     if sufficient datanodes exist, nothing happens;
@@ -116,35 +122,53 @@ def dataNodeTemplate(count):
         numberOfDataNodes += 1
 
         r = requests.patch(DATANODE + ".json", d)
+        print(r.json())
 
+def addFileName(fileName, numPartition):
 
-createNameNode("cars.csv", "/user/suraj", 4)
+    r = requests.get(DATANODE + ".json")
+    print(r.json())
+    count = 0
+    for datanode, value in dict(r.json()).items():
+        if(count >= numPartition):
+            break
+        d = {fileName : ""}
+        d = json.dumps(d)
+        r = requests.patch(DATANODE + datanode + ".json", d)
+        print(r.json())
+        count += 1
 
 def put(path, filename, numPartition, partitionCol = None):
 
     #TO-DO READ FILE CONTENTS
+
+    createDataNode(filename, numPartition)
     createNameNode(filename, path, numPartition)
 
-# while(1):
+# put("/user/john", "moped___csv", 3)
+# addFileName("cars___csv", 5)
+while(1):
 
-#     command = input(">")
-#     if(command.split(" ")[0] == "exit"):
-#         sys.exit("Exiting ....")
-#     try:
-#         action, path = command.split(" ")[0], command.split(" ")[1]
-#         if(action == "mkdir"):
-#             mkdir(path)
-#         elif(action == "ls"):
-#             ls(path)
-#         elif(action == "rm"):
-#             rm(path)
-#         elif(action == "put"):
-#             filename = path
-#             path = command.split(" ")[2]
-#             numPartitions = command.split(" ")[3]
-#             partitionCol = command.split(" ")[4] if command.split(" ")[4] else None
-#             put(filename, path, numPartitions, partitionCol)
-#         else:
-#             break
-#     except:
-#         print("Invalid format")
+    command = input(">")
+    if(command.split(" ")[0] == "exit"):
+        sys.exit("Exiting ....")
+    try:
+        action, path = command.split(" ")[0], command.split(" ")[1]
+        if(action == "mkdir"):
+            mkdir(path)
+        elif(action == "ls"):
+            ls(path)
+        elif(action == "rm"):
+            rm(path)
+        elif(action == "put"):
+            filename = command.split(" ")[1]
+            #Firebase does not allow the "." character
+            filename = filename[:-4] + "___csv"
+            path = command.split(" ")[2]
+            numPartitions = int(command.split(" ")[3])
+            partitionCol = command.split(" ")[4] if len(command.split(" ")) > 4 else None
+            put(path, filename, numPartitions, partitionCol)
+        else:
+            break
+    except:
+        print("Invalid format")
