@@ -73,6 +73,27 @@ def ls(directory):
             print(level)
     else:
         print("")
+        
+def asciiConvert(attr):
+    attr = str(attr)
+    asciiSum = 0
+    for c in attr: 
+        asciiSum += (ord(c))
+    return asciiSum
+
+def hashVal(attr, k):
+    asciiSum = asciiConvert(attr)
+    return asciiSum%k
+
+def partition(data, k, attr = None):
+    d = {}
+    for row in data.index:
+        attrVal = data.loc[row][attr]
+        h = hashVal(attrVal, k)
+        if h not in d.keys():
+            d[h] = []
+        d[h].append(data.loc[row].to_json())
+    return d
 
 def createNameNode(filename, path, numPartition):
     
@@ -139,6 +160,12 @@ def addFileName(fileName, numPartition):
         count += 1
 
 def put(path, filename, numPartition, partitionCol = None):
+    
+    #To send to partition function
+    data = pd.read_csv(filename)
+    if partitionCol = None:
+        partitionCol = data.keys()[0]
+    bucketDict = partition(data, k, partitionCol)
 
     #TO-DO READ FILE CONTENTS
 
