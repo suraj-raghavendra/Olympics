@@ -4,6 +4,7 @@ import requests
 import json
 import sys
 import hash
+import pandas as pd
 
 FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
 NAMENODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/NameNode/root/"
@@ -92,7 +93,11 @@ def partition(data, k, attr = None):
         h = hashVal(attrVal, k)
         if h not in d.keys():
             d[h] = []
-        d[h].append(data.loc[row].to_json())
+        record = data.loc[row].to_json()
+        parsed = json.loads(record)
+        # d[h].append(data.loc[row].to_json())
+        # print(parsed, type(parsed))
+        d[h].append(parsed)
     return d
 
 def createNameNode(filename, path, numPartition):
@@ -105,14 +110,11 @@ def createNameNode(filename, path, numPartition):
     d = { "k" : numPartition}
     for i in range(numPartition):
         d["partition_" + str(i)] = DATANODE + "DataNode_" + str(i)
-    print(d)
     d = json.dumps(d)
-    print(NAMENODE + filePath + ".json")
     r = requests.patch(NAMENODE + filePath + ".json", data = d)
 
     #Add fileName to each of the DataNodes
     addFileName(filename, numPartition)
-    print(r.json())
 
 def createDataNode(fileName, numPartition):
 
@@ -138,41 +140,91 @@ def dataNodeTemplate(count, fileName):
     numberOfDataNodes = len(r.json())
 
     for i in range(count):
-        d = { "DataNode_" + str(numberOfDataNodes + 1) : ""}
+        d = { "DataNode_" + str(numberOfDataNodes) : ""}
         d = json.dumps(d)
         numberOfDataNodes += 1
 
         r = requests.patch(DATANODE + ".json", d)
-        print(r.json())
 
 def addFileName(fileName, numPartition):
 
     r = requests.get(DATANODE + ".json")
-    print(r.json())
+    # print(r.json())
     count = 0
     for datanode, value in dict(r.json()).items():
         if(count >= numPartition):
             break
+        # print("**** ADD FILE NAME VALUE", value)
+        if(fileName in value):
+            continue
         d = {fileName : ""}
         d = json.dumps(d)
         r = requests.patch(DATANODE + datanode + ".json", d)
-        print(r.json())
         count += 1
 
 def put(path, filename, numPartition, partitionCol = None):
     
     #To send to partition function
-    data = pd.read_csv(filename)
-    if partitionCol = None:
+
+    data = pd.read_csv(filename[:-6] + ".csv")
+    # data = data.iloc[8:12]
+
+    if not partitionCol:
         partitionCol = data.keys()[0]
-    bucketDict = partition(data, k, partitionCol)
+    bucketDict = partition(data, numPartition, partitionCol)
 
     #TO-DO READ FILE CONTENTS
 
     createDataNode(filename, numPartition)
     createNameNode(filename, path, numPartition)
 
-# put("/user/john", "moped___csv", 3)
+    pushDataToDataNode(bucketDict, filename, path)
+
+def getPartitionLocations(filename, path):
+    """
+    return : Locations of all partitions
+    """
+    r = requests.get(NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
+    locations = r.json()
+    if not locations:
+        print("No content exists")
+    else:
+        del locations['k']
+        return locations
+
+def pushDataToDataNode(data, filename, path):
+    """
+    Pushes the hashed rows into the pertinent DataNode
+    """
+    locations = getPartitionLocations(filename, path)
+
+    for key, value in locations.items():
+        if(int(key[-1]) in data):
+            datanode_URI = value + "/" + filename + "/.json"
+            print(datanode_URI)
+            # print(json.dumps(data[int(key[-1])][:2]))
+
+            r = requests.get(datanode_URI)
+            bucketData = []
+            if(r.json()):
+                bucketData = r.json()
+            bucketData.extend(data[int(key[-1])])
+
+            d = {filename : bucketData}
+            d = json.dumps(d)
+            r = requests.patch(value + ".json", d)
+            # print(r.json())
+  
+def printPartitionLocations(locations):
+    """
+    prints the location JSON object in the format --> Partition number : Location in firebase
+    """
+    for key, value in locations.items():
+            print(key, " : ",value)
+
+
+# getPartitionLocations("test___csv", "/user/smaran")
+# put("/user/smaran", "test___csv", 3)
 # addFileName("cars___csv", 5)
 while(1):
 
@@ -195,7 +247,15 @@ while(1):
             numPartitions = int(command.split(" ")[3])
             partitionCol = command.split(" ")[4] if len(command.split(" ")) > 4 else None
             put(path, filename, numPartitions, partitionCol)
+        elif(action == "getPartitionLocations"):
+            filename = command.split(" ")[1]
+            #Firebase does not allow the "." character
+            filename = filename[:-4] + "___csv"
+            locations = getPartitionLocations(filename, path)
+            printPartitionLocations(locations)
         else:
             break
+    except FileNotFoundError:
+        print("File not found")
     except:
         print("Invalid format")
