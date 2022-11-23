@@ -5,6 +5,10 @@ import json
 import sys
 import hash
 import pandas as pd
+import logging
+
+FORMAT = "[%(asctime)s %(filename)s->%(funcName)s():%(lineno)s]%(levelname)s: %(message)s"
+logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
 NAMENODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/NameNode/root/"
@@ -100,24 +104,27 @@ def partition(data, k, attr = None):
         d[h].append(parsed)
     return d
 
-def createNameNode(filename, path, numPartition):
+def createNameNode(filename, path, numPartition, partitionColumn):
     
+    logging.info("Creating the NameNode template")
     filePath = path + "/" + filename
 
     mkdir(filePath)
 
     #upload file metadata in the namenode
     d = { "k" : numPartition}
+    d["partitionColumn"] = partitionColumn
     for i in range(numPartition):
         d["partition_" + str(i)] = DATANODE + "DataNode_" + str(i)
     d = json.dumps(d)
     r = requests.patch(NAMENODE + filePath + ".json", data = d)
-
+    print(r.json())
     #Add fileName to each of the DataNodes
     addFileName(filename, numPartition)
 
 def createDataNode(fileName, numPartition):
 
+    logging.info("Creating the DataNode template")
     r = requests.get(DATANODE + ".json")
     if(not r.json()):
         dataNodeTemplate(numPartition, fileName)
@@ -167,7 +174,7 @@ def put(path, filename, numPartition, partitionCol = None):
     #To send to partition function
 
     data = pd.read_csv(filename[:-6] + ".csv")
-    # data = data.iloc[8:12]
+    data = data.iloc[8:12]
 
     if not partitionCol:
         partitionCol = data.keys()[0]
@@ -176,7 +183,7 @@ def put(path, filename, numPartition, partitionCol = None):
     #TO-DO READ FILE CONTENTS
 
     createDataNode(filename, numPartition)
-    createNameNode(filename, path, numPartition)
+    createNameNode(filename, path, numPartition, partitionCol)
 
     pushDataToDataNode(bucketDict, filename, path)
 
@@ -184,18 +191,22 @@ def getPartitionLocations(filename, path):
     """
     return : Locations of all partitions
     """
+    logging.info("Looking for all partition in the NameNode")
     r = requests.get(NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
     locations = r.json()
     if not locations:
         print("No content exists")
     else:
         del locations['k']
+        del locations['partitionColumn']
         return locations
 
 def pushDataToDataNode(data, filename, path):
     """
     Pushes the hashed rows into the pertinent DataNode
     """
+
+    logging.info("Pushing Data to the respective buckets in DataNode")
     locations = getPartitionLocations(filename, path)
 
     for key, value in locations.items():
@@ -224,38 +235,38 @@ def printPartitionLocations(locations):
 
 
 # getPartitionLocations("test___csv", "/user/smaran")
-# put("/user/smaran", "test___csv", 3)
+put("/user/hi", "test___csv", 3)
 # addFileName("cars___csv", 5)
-while(1):
+# while(1):
 
-    command = input(">")
-    if(command.split(" ")[0] == "exit"):
-        sys.exit("Exiting ....")
-    try:
-        action, path = command.split(" ")[0], command.split(" ")[1]
-        if(action == "mkdir"):
-            mkdir(path)
-        elif(action == "ls"):
-            ls(path)
-        elif(action == "rm"):
-            rm(path)
-        elif(action == "put"):
-            filename = command.split(" ")[1]
-            #Firebase does not allow the "." character
-            filename = filename[:-4] + "___csv"
-            path = command.split(" ")[2]
-            numPartitions = int(command.split(" ")[3])
-            partitionCol = command.split(" ")[4] if len(command.split(" ")) > 4 else None
-            put(path, filename, numPartitions, partitionCol)
-        elif(action == "getPartitionLocations"):
-            filename = command.split(" ")[1]
-            #Firebase does not allow the "." character
-            filename = filename[:-4] + "___csv"
-            locations = getPartitionLocations(filename, path)
-            printPartitionLocations(locations)
-        else:
-            break
-    except FileNotFoundError:
-        print("File not found")
-    except:
-        print("Invalid format")
+#     command = input(">")
+#     if(command.split(" ")[0] == "exit"):
+#         sys.exit("Exiting ....")
+#     try:
+#         action, path = command.split(" ")[0], command.split(" ")[1]
+#         if(action == "mkdir"):
+#             mkdir(path)
+#         elif(action == "ls"):
+#             ls(path)
+#         elif(action == "rm"):
+#             rm(path)
+#         elif(action == "put"):
+#             filename = command.split(" ")[1]
+#             #Firebase does not allow the "." character
+#             filename = filename[:-4] + "___csv"
+#             path = command.split(" ")[2]
+#             numPartitions = int(command.split(" ")[3])
+#             partitionCol = command.split(" ")[4] if len(command.split(" ")) > 4 else None
+#             put(path, filename, numPartitions, partitionCol)
+#         elif(action == "getPartitionLocations"):
+#             filename = command.split(" ")[1]
+#             #Firebase does not allow the "." character
+#             filename = filename[:-4] + "___csv"
+#             locations = getPartitionLocations(filename, path)
+#             printPartitionLocations(locations)
+#         else:
+#             break
+#     except FileNotFoundError:
+#         print("File not found")
+#     except Exception as e:
+#         logging.error("Failure" + repr(e))
