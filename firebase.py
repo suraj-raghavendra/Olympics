@@ -8,6 +8,7 @@ import hash
 import pandas as pd
 import logging
 import map
+import analytics
 
 from map import FIREBASE_URL
 
@@ -279,25 +280,53 @@ def search(filename, searchColumn, searchQuery):
         locations = getPartitionLocations(filename, filePath)
         partitionColumn = locations['partitionColumn']
         k = locations['k']
+        resDF = pd.DataFrame()
         if(partitionColumn == searchColumn):
             hashValue = hashVal(searchQuery, k)
             partition_URI = locations["partition_" + str(hashValue)] + "/" + filename
-            df = map.mapPartition(partition_URI, searchColumn, searchQuery)
+            df = map.mapPartition(partition_URI)
+            df = df[df[searchColumn] == searchQuery]
+            resDF = df
         else:
             logging.info("Fetching data from all partitions")
-            resDF = pd.DataFrame()
             for key, value in locations.items():
                 if(key == "k" or key == "partitionColumn"):
                     continue
                 partition_URI = value + "/" +filename
-                df = map.mapPartition(partition_URI, searchColumn, searchQuery)
+                df = map.mapPartition(partition_URI)
+                df = df[df[searchColumn] == searchQuery]
                 resDF = combineDF(resDF, df)
+        print(resDF)
     else:
         logging.info("File not found")
         print("File Not found")
     # if(searchColumn)
 
-search("test___csv", "Name", "John Aalberg")
+def dataAnalytics(filename, column, analyticFunction):
+    r = requests.get(FILENAME + ".json")
+    filePaths = r.json()
+    if(filename in filePaths):
+        filePath = filePaths[filename]
+        logging.info("File Found")
+        file_URI = NAMENODE + filePath
+        locations = getPartitionLocations(filename, filePath)
+        logging.info("Fetching data from all partitions")
+        resDF = pd.DataFrame()
+        for key, value in locations.items():
+            if(key == "k" or key == "partitionColumn"):
+                continue
+            partition_URI = value + "/" +filename
+            df = map.mapPartition(partition_URI)
+            resDF = combineDF(resDF, df)
+        if(analyticFunction == "mean"):
+            average = analytics.mean(resDF, "Height")
+            print("AVERAGE = ", average)
+    else:
+        logging.info("File not found")
+        print("File Not found")
+
+dataAnalytics("test___csv", "Height", "mean")
+# search("test___csv", "Name", "John Aalberg")
 # init()
 # getPartitionLocations("test___csv", "/user/smaran")
 # put("/user/hi", "test___csv", 4, "City")

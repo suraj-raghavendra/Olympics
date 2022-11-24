@@ -1,5 +1,4 @@
 import requests
-import requests
 import json
 import sys
 import hash
@@ -10,15 +9,17 @@ FORMAT = "[%(asctime)s %(filename)s->%(funcName)s():%(lineno)s]%(levelname)s: %(
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
-NAMENODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/NameNode/root/"
-DATANODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/DataNode/root/"
+# FIREBASE_URL = "https://suraj-test-45b9c-default-rtdb.firebaseio.com/"
+NAMENODE = FIREBASE_URL + "NameNode/root/"
+DATANODE = FIREBASE_URL + "DataNode/root/"
 CURRENT_DIR = "root"
+FILENAME = FIREBASE_URL + "/FileName"
 
-def mapPartition(p, searchColumn, searchQuery):
+def mapPartition(p):
     # PARTITION_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/DataNode/root/DataNode_0/test___csv"
     r = requests.get(p +"/.json")
     data = r.json()
 
     df = pd.json_normalize(data)
-    df = df[df[searchColumn] == searchQuery]
+
     return df
