@@ -15,6 +15,31 @@ logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 
 def mean(df, meanColumn):
-
+    logging.info(f"Calculating mean of {meanColumn}")
     average = df[meanColumn].mean()
     return average
+
+def median(df, medianColumn):
+    logging.info(f"Calculating median of {medianColumn}")
+    median_ = df[medianColumn].median()
+    return median_
+
+def mode(df , modeColumn):
+    logging.info(f"Calculating mode of {modeColumn}")
+    mode_ = df[modeColumn].mode()
+    return mode_
+
+def minimum(df, minColumn):
+    logging.info(f"Calculating the minimum of {minColumn}")
+    minimum_ = df[minColumn].min()
+    return minimum_
+
+def maximum(df, maxColumn):
+    logging.info(f"Calculating the maximum of {maxColumn}")
+    maximum_ = df[maxColumn].max()
+    return maximum_
+
+def standardDeviation(df, stdColumn):
+    logging.info(f"Calculating the standard deviation of {stdColumn}")
+    std_dev = df[stdColumn].std()
+    return std_dev

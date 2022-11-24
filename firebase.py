@@ -1,6 +1,7 @@
 from cmath import e
 from os import path
 from time import sleep
+from numpy import maximum, minimum
 import requests
 import json
 import sys
@@ -9,6 +10,7 @@ import pandas as pd
 import logging
 import map
 import analytics
+from pandas.api.types import is_object_dtype, is_numeric_dtype, is_bool_dtype
 
 from map import FIREBASE_URL
 
@@ -318,14 +320,50 @@ def dataAnalytics(filename, column, analyticFunction):
             partition_URI = value + "/" +filename
             df = map.mapPartition(partition_URI)
             resDF = combineDF(resDF, df)
+
+        if(not is_numeric_dtype(df[column])):
+            print("Column does not contain numeric values")
+            return
         if(analyticFunction == "mean"):
-            average = analytics.mean(resDF, "Height")
+            average = analytics.mean(resDF, column)
             print("AVERAGE = ", average)
+            return
+        if(analyticFunction == "minimum"):
+            minimum = analytics.minimum(resDF, column)
+            print(f"Minimum = {minimum}")
+            return
+        if(analyticFunction == "maximum"):
+            maximum = analytics.maximum(resDF, column)
+            print(f"Maximum = {maximum}")
+            return
+        if(analyticFunction == "range"):
+            range = analytics.maximum(resDF, column) - analytics.minimum(resDF, column)
+            print(f"Range = {range}")
+            return
+        if(analyticFunction == "standardDeviation"):
+            stdDev = analytics.standardDeviation(resDF, column)
+            print(f"Standard Deviation = {stdDev}")
+            return
+
+        if(analyticFunction == "median"):
+            median = analytics.median(resDF, column)
+            print(f"Median = {median}")
+            return
+        if(analyticFunction == "mode"):
+            mode = analytics.mode(resDF, column)
+            print(f"Mode = {mode}")
+            return
     else:
         logging.info("File not found")
         print("File Not found")
 
-dataAnalytics("test___csv", "Height", "mean")
+# dataAnalytics("test___csv", "Height", "range")
+# dataAnalytics("test___csv", "Height", "standardDeviation")
+# dataAnalytics("test___csv", "Height", "minimum")
+# dataAnalytics("test___csv", "Height", "maximum")
+# dataAnalytics("test___csv", "Height", "mean")
+# dataAnalytics("test___csv", "Height", "median")
+dataAnalytics("test___csv", "Height", "mode")
 # search("test___csv", "Name", "John Aalberg")
 # init()
 # getPartitionLocations("test___csv", "/user/smaran")
