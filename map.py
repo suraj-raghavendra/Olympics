@@ -16,7 +16,6 @@ CURRENT_DIR = "root"
 
 def mapPartition(p, searchColumn, searchQuery):
     # PARTITION_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/DataNode/root/DataNode_0/test___csv"
-    print(p)
     r = requests.get(p +"/.json")
     data = r.json()
 

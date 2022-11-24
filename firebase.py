@@ -264,6 +264,10 @@ def printPartitionLocations(locations):
     for key, value in locations.items():
             print(key, " : ",value)
 
+def combineDF(df1, df2):
+    return pd.concat([df1, df2])
+
+
 def search(filename, searchColumn, searchQuery):
     
     r = requests.get(FILENAME + ".json")
@@ -273,24 +277,27 @@ def search(filename, searchColumn, searchQuery):
         logging.info("File Found")
         file_URI = NAMENODE + filePath
         locations = getPartitionLocations(filename, filePath)
-        print(locations)
         partitionColumn = locations['partitionColumn']
         k = locations['k']
         if(partitionColumn == searchColumn):
             hashValue = hashVal(searchQuery, k)
             partition_URI = locations["partition_" + str(hashValue)] + "/" + filename
             df = map.mapPartition(partition_URI, searchColumn, searchQuery)
-            print(df.head(5))
         else:
-            print("Different col")
-
-        
+            logging.info("Fetching data from all partitions")
+            resDF = pd.DataFrame()
+            for key, value in locations.items():
+                if(key == "k" or key == "partitionColumn"):
+                    continue
+                partition_URI = value + "/" +filename
+                df = map.mapPartition(partition_URI, searchColumn, searchQuery)
+                resDF = combineDF(resDF, df)
     else:
         logging.info("File not found")
         print("File Not found")
     # if(searchColumn)
-    pass
-search("test___csv", "City", "London")
+
+search("test___csv", "Name", "John Aalberg")
 # init()
 # getPartitionLocations("test___csv", "/user/smaran")
 # put("/user/hi", "test___csv", 4, "City")
