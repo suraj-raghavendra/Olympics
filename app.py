@@ -1,3 +1,5 @@
+#app.py>
+
 from cmath import e
 from os import path
 from time import sleep
@@ -62,7 +64,7 @@ def show_DB(path = None):
 
 def mkdir(directory):
 #input :- "/user/john/keanu"
-
+    print(directory)
     levels = directory.split("/")
     PWD = NAMENODE
 
@@ -87,7 +89,7 @@ def pwd(directory):
     pass
 
 def rm(directory):
-
+    print(directory)
     levels = directory.split("/")
     PWD = NAMENODE
     for level in levels[1:-1]:
@@ -97,7 +99,7 @@ def rm(directory):
 
 
 def ls(directory):
-
+    print(directory)
     levels = directory.split("/")
     PWD = NAMENODE
     for level in levels[1:]:
@@ -208,7 +210,7 @@ def createFileNodeEntry(filename, path):
     logging.info("Created FileNode entry")
 
 def put(path, filename, numPartition, partitionCol = None):
-    
+    print(path, filename, numPartition, partitionCol)
     #To send to partition function
 
     data = pd.read_csv(filename[:-6] + ".csv")
