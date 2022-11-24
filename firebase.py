@@ -1,4 +1,5 @@
 from cmath import e
+from os import path
 from time import sleep
 import requests
 import json
@@ -6,23 +7,53 @@ import sys
 import hash
 import pandas as pd
 import logging
+import map
+
+from map import FIREBASE_URL
 
 FORMAT = "[%(asctime)s %(filename)s->%(funcName)s():%(lineno)s]%(levelname)s: %(message)s"
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 
 FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
-NAMENODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/NameNode/root/"
-DATANODE = "https://olympics-62c6a-default-rtdb.firebaseio.com/DataNode/root/"
+# FIREBASE_URL = "https://suraj-test-45b9c-default-rtdb.firebaseio.com/"
+NAMENODE = FIREBASE_URL + "NameNode/root/"
+DATANODE = FIREBASE_URL + "DataNode/root/"
 CURRENT_DIR = "root"
+FILENAME = FIREBASE_URL + "/FileName"
 
 def init():
-    data =  requests.get(FIREBASE_URL + ".json")
-    print(data.json())
 
-    d = json.dumps({"another_user2" : "user data"})
+    r = requests.get(NAMENODE + ".json")
+    if(not r.json()):
+        d = { "NameNode" : 
+                           {
+                               "root" : ""
+                           },  
+                }
+        d = json.dumps(d)
+        f = requests.patch(FIREBASE_URL + ".json", data = d)
+        logging.info("NameNode created")
+    logging.info("NameNode already present")
 
-    r = requests.patch(NAMENODE , data = d)
-    print(r.json())
+    r = requests.get(DATANODE + ".json")
+    if(not r.json()):
+        d = { "DataNode" : 
+                           {
+                               "root" : ""
+                           },  
+                }
+        d = json.dumps(d)
+        f = requests.patch(FIREBASE_URL + ".json", data = d)
+        logging.info("DataNode created")
+    logging.info("DataNode already present")
+
+    r = requests.get(FILENAME + ".json")
+    if(not r.json()):
+        d = { "FileName" : ""}
+        d = json.dumps(d)
+        f = requests.patch(FIREBASE_URL + ".json", data = d)
+        logging.info("FileNode created")
+    logging.info("FileNode already present")
 
 def show_DB(path = None):
     data =  requests.get(FIREBASE_URL + path + ".json")
@@ -118,7 +149,6 @@ def createNameNode(filename, path, numPartition, partitionColumn):
         d["partition_" + str(i)] = DATANODE + "DataNode_" + str(i)
     d = json.dumps(d)
     r = requests.patch(NAMENODE + filePath + ".json", data = d)
-    print(r.json())
     #Add fileName to each of the DataNodes
     addFileName(filename, numPartition)
 
@@ -155,6 +185,7 @@ def dataNodeTemplate(count, fileName):
 
 def addFileName(fileName, numPartition):
 
+    logging.info("Adding File name to the DataNodes")
     r = requests.get(DATANODE + ".json")
     # print(r.json())
     count = 0
@@ -169,36 +200,37 @@ def addFileName(fileName, numPartition):
         r = requests.patch(DATANODE + datanode + ".json", d)
         count += 1
 
+def createFileNodeEntry(filename, path):
+    d = { filename : path}
+    d = json.dumps(d)
+    r = requests.patch(FILENAME + ".json", data = d)
+    logging.info("Created FileNode entry")
+
 def put(path, filename, numPartition, partitionCol = None):
     
     #To send to partition function
 
     data = pd.read_csv(filename[:-6] + ".csv")
-    data = data.iloc[8:12]
+    data = data.iloc[:12]
 
     if not partitionCol:
         partitionCol = data.keys()[0]
     bucketDict = partition(data, numPartition, partitionCol)
-
-    #TO-DO READ FILE CONTENTS
-
+    createFileNodeEntry(filename, path)
     createDataNode(filename, numPartition)
     createNameNode(filename, path, numPartition, partitionCol)
-
     pushDataToDataNode(bucketDict, filename, path)
 
 def getPartitionLocations(filename, path):
     """
     return : Locations of all partitions
     """
-    logging.info("Looking for all partition in the NameNode")
+    logging.info("Looking for all partitions in the NameNode")
     r = requests.get(NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
     locations = r.json()
     if not locations:
         print("No content exists")
     else:
-        del locations['k']
-        del locations['partitionColumn']
         return locations
 
 def pushDataToDataNode(data, filename, path):
@@ -208,11 +240,11 @@ def pushDataToDataNode(data, filename, path):
 
     logging.info("Pushing Data to the respective buckets in DataNode")
     locations = getPartitionLocations(filename, path)
-
+    del locations['partitionColumn']
+    del locations['k']
     for key, value in locations.items():
         if(int(key[-1]) in data):
             datanode_URI = value + "/" + filename + "/.json"
-            print(datanode_URI)
             # print(json.dumps(data[int(key[-1])][:2]))
 
             r = requests.get(datanode_URI)
@@ -224,7 +256,6 @@ def pushDataToDataNode(data, filename, path):
             d = {filename : bucketData}
             d = json.dumps(d)
             r = requests.patch(value + ".json", d)
-            # print(r.json())
   
 def printPartitionLocations(locations):
     """
@@ -233,9 +264,36 @@ def printPartitionLocations(locations):
     for key, value in locations.items():
             print(key, " : ",value)
 
+def search(filename, searchColumn, searchQuery):
+    
+    r = requests.get(FILENAME + ".json")
+    filePaths = r.json()
+    if(filename in filePaths):
+        filePath = filePaths[filename]
+        logging.info("File Found")
+        file_URI = NAMENODE + filePath
+        locations = getPartitionLocations(filename, filePath)
+        print(locations)
+        partitionColumn = locations['partitionColumn']
+        k = locations['k']
+        if(partitionColumn == searchColumn):
+            hashValue = hashVal(searchQuery, k)
+            partition_URI = locations["partition_" + str(hashValue)] + "/" + filename
+            df = map.mapPartition(partition_URI, searchColumn, searchQuery)
+            print(df.head(5))
+        else:
+            print("Different col")
 
+        
+    else:
+        logging.info("File not found")
+        print("File Not found")
+    # if(searchColumn)
+    pass
+search("test___csv", "City", "London")
+# init()
 # getPartitionLocations("test___csv", "/user/smaran")
-put("/user/hi", "test___csv", 3)
+# put("/user/hi", "test___csv", 4, "City")
 # addFileName("cars___csv", 5)
 # while(1):
 
