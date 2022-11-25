@@ -1,7 +1,7 @@
 import requests
 import json
 import sys
-import hash
+# import hash
 import pandas as pd
 import logging
 
