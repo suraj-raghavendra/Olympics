@@ -65,7 +65,7 @@ def show_DB(path = None):
 
 def mkdir(directory):
 #input :- "/user/john/keanu"
-    print(directory)
+    # print(directory)
     levels = directory.split("/")
     PWD = NAMENODE
 
@@ -99,7 +99,7 @@ def rm(directory):
     print(delete_object.json())
 
 def ls(directory):
-    print(directory)
+
     levels = directory.split("/")
     PWD = NAMENODE
     for level in levels[1:]:
@@ -109,7 +109,11 @@ def ls(directory):
     if(g.json()):
         levels_dict = g.json()
         for level, _ in levels_dict.items():
-            print(level)
+            if(level[-6:] == "___csv"):
+                level = "File      : " + level[:-6] + ".csv"
+                print(level)
+                continue
+            print("Directory : " + level)
     else:
         print("")
         
@@ -212,8 +216,8 @@ def createFileNodeEntry(filename, path):
 def put(path, filename, numPartition, partitionCol = None):
     print(path, filename, numPartition, partitionCol)
     #To send to partition function
-
-    data = pd.read_csv(filename[:-6] + ".csv")
+    filename = fileNameParser(filename)
+    data = pd.read_csv(filename)
     data = data.iloc[:12]
 
     if not partitionCol:
@@ -223,6 +227,8 @@ def put(path, filename, numPartition, partitionCol = None):
     createDataNode(filename, numPartition)
     createNameNode(filename, path, numPartition, partitionCol)
     pushDataToDataNode(bucketDict, filename, path)
+    logging.info("File successfully uploaded to EDFS")
+    print("File successfully added to EDFS")
 
 def getPartitionLocations(filename, path):
     """
@@ -231,8 +237,10 @@ def getPartitionLocations(filename, path):
     logging.info("Looking for all partitions in the NameNode")
     r = requests.get(NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
     locations = r.json()
+    print("line 238", locations, NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
     if not locations:
         print("No content exists")
+        return None
     else:
         return locations
 
@@ -273,6 +281,7 @@ def combineDF(df1, df2):
 
 def search(filename, searchColumn, searchQuery):
     
+    filename = fileNameParser(filename)
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
     if(filename in filePaths):
@@ -280,6 +289,10 @@ def search(filename, searchColumn, searchQuery):
         logging.info("File Found")
         file_URI = NAMENODE + filePath
         locations = getPartitionLocations(filename, filePath)
+        if not locations:
+            logging.info("Enter the correct column name")
+            print("Please enter the correct column  name")
+            return
         partitionColumn = locations['partitionColumn']
         k = locations['k']
         resDF = pd.DataFrame()
@@ -302,9 +315,10 @@ def search(filename, searchColumn, searchQuery):
     else:
         logging.info("File not found")
         print("File Not found")
-    # if(searchColumn)
 
 def dataAnalytics(filename, column, analyticFunction):
+
+    filename = fileNameParser(filename)
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
     if(filename in filePaths):
@@ -312,6 +326,10 @@ def dataAnalytics(filename, column, analyticFunction):
         logging.info("File Found")
         file_URI = NAMENODE + filePath
         locations = getPartitionLocations(filename, filePath)
+        if not locations:
+            logging.info("Enter the correct column name")
+            print("Please enter the correct column  name")
+            return
         logging.info("Fetching data from all partitions")
         resDF = pd.DataFrame()
         for key, value in locations.items():
@@ -361,6 +379,8 @@ def cat(filename, numLines = 5):
     """
     Accepts filename and number of lines to print in the file, by default, number of lines = 5 
     """
+    # filename = fileNameParser(filename)
+    logging.info("Cat function")
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
     if(filename in filePaths):
@@ -381,8 +401,13 @@ def cat(filename, numLines = 5):
     else:
         print("File Not found")
 
-cat("test___csv")
-# dataAnalytics("test___csv", "Height", "range")
+def fileNameParser(filename):
+    filename = filename[:-4] + "___csv"
+    return filename
+
+# init()
+# cat("test___csv")
+# dataAnalytics("test.csv", "Age", "range")
 # dataAnalytics("test___csv", "Height", "standardDeviation")
 # dataAnalytics("test___csv", "Height", "minimum")
 # dataAnalytics("test___csv", "Height", "maximum")
