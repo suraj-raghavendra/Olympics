@@ -358,7 +358,9 @@ def dataAnalytics(filename, column, analyticFunction):
         print("File Not found")
 
 def cat(filename, numLines = 5):
-    #convert file to DF and print head
+    """
+    Accepts filename and number of lines to print in the file, by default, number of lines = 5 
+    """
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
     if(filename in filePaths):
