@@ -7,7 +7,6 @@ from numpy import maximum, minimum
 import requests
 import json
 import sys
-import hash
 import pandas as pd
 import logging
 import map
@@ -98,7 +97,6 @@ def rm(directory):
         PWD = PWD + level + "/"
     delete_object = requests.delete(PWD + "/.json" )
     print(delete_object.json())
-
 
 def ls(directory):
     print(directory)
@@ -359,13 +357,36 @@ def dataAnalytics(filename, column, analyticFunction):
         logging.info("File not found")
         print("File Not found")
 
+def cat(filename, numLines = 5):
+    #convert file to DF and print head
+    r = requests.get(FILENAME + ".json")
+    filePaths = r.json()
+    if(filename in filePaths):
+        filePath = filePaths[filename]
+        logging.info("File Found")
+        file_URI = NAMENODE + filePath
+        locations = getPartitionLocations(filename, filePath)
+        partitionColumn = locations['partitionColumn']
+        resDF = pd.DataFrame()
+        logging.info("Fetching data from all partitions")
+        for key, value in locations.items():
+            if(key == "k" or key == "partitionColumn"):
+                continue
+            partition_URI = value + "/" +filename
+            df = map.mapPartition(partition_URI)
+            resDF = combineDF(resDF, df)
+        print(resDF.head(numLines))
+    else:
+        print("File Not found")
+
+cat("test___csv")
 # dataAnalytics("test___csv", "Height", "range")
 # dataAnalytics("test___csv", "Height", "standardDeviation")
 # dataAnalytics("test___csv", "Height", "minimum")
 # dataAnalytics("test___csv", "Height", "maximum")
 # dataAnalytics("test___csv", "Height", "mean")
 # dataAnalytics("test___csv", "Height", "median")
-dataAnalytics("test___csv", "Height", "mode")
+# dataAnalytics("test___csv", "Height", "mode")
 # search("test___csv", "Name", "John Aalberg")
 # init()
 # getPartitionLocations("test___csv", "/user/smaran")
