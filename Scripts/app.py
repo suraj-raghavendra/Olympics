@@ -216,8 +216,9 @@ def createFileNodeEntry(filename, path):
 def put(path, filename, numPartition, partitionCol = None):
     print(path, filename, numPartition, partitionCol)
     #To send to partition function
-    filename = fileNameParser(filename)
+#     filename = fileNameParser(filename)
     data = pd.read_csv(filename)
+    filename = fileNameParser(filename)
     data = data.iloc[:12]
 
     if not partitionCol:
@@ -383,6 +384,7 @@ def cat(filename, numLines = 5):
     logging.info("Cat function")
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
+    filename = fileNameParser(filename)
     if(filename in filePaths):
         filePath = filePaths[filename]
         logging.info("File Found")
