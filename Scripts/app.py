@@ -381,6 +381,31 @@ def dataAnalytics(filename, column, analyticFunction):
         logging.info("File not found")
         print("File Not found")
 
+def readPartitionData(filename, partitionNumber, numLines = "5"):
+
+    logging.info("Read Partition Data")
+    numLines = int(numLines)
+    r = requests.get(FILENAME + ".json")
+    filePaths = r.json()
+    filenameOriginal = filename
+    filename = fileNameParser(filename)
+    if(filename in filePaths):
+        filePath = filePaths[filename]
+        logging.info("File Found")
+        file_URI = NAMENODE + filePath
+        locations = getPartitionLocations(filenameOriginal, filePath)
+        resDF = pd.DataFrame()
+        
+        if("partition_" + partitionNumber in locations):
+            partition_URI = locations["partition_" + partitionNumber] + "/" +filename
+            resDF = map.mapPartition(partition_URI)
+            print(resDF.head(numLines))
+        else:
+            print("Incorrect partition number")
+    else:
+        print("File Not found")
+
+
 def cat(filename, numLines = 5):
     """
     Accepts filename and number of lines to print in the file, by default, number of lines = 5 
@@ -413,7 +438,8 @@ def fileNameParser(filename):
     filename = filename[:-4] + "___csv"
     return filename
 
-init()
+# init()
+# readPartitionData("athlete_events.csv", "1", "8")
 # cat("test___csv")
 # dataAnalytics("test.csv", "Age", "range")
 # dataAnalytics("test___csv", "Height", "standardDeviation")
