@@ -79,6 +79,7 @@ def mkdir(directory):
             continue
         r = requests.patch(PWD + ".json", data=d)
         PWD = PWD + level + "/"
+#     print("Succesfully added directory")
 
     # show_DB()
 
@@ -90,13 +91,13 @@ def pwd(directory):
     pass
 
 def rm(directory):
-    print(directory)
+#     print(directory)
     levels = directory.split("/")
     PWD = NAMENODE
     for level in levels[1:-1]:
         PWD = PWD + level + "/"
     delete_object = requests.delete(PWD + "/.json" )
-    print(delete_object.json())
+    print("Succesfully removed")
 
 def ls(directory):
 
@@ -214,19 +215,21 @@ def createFileNodeEntry(filename, path):
     logging.info("Created FileNode entry")
 
 def put(path, filename, numPartition, partitionCol = None):
-    print(path, filename, numPartition, partitionCol)
+#     print(path, filename, numPartition, partitionCol)
     #To send to partition function
 #     filename = fileNameParser(filename)
     data = pd.read_csv(filename)
-    filename = fileNameParser(filename)
-    data = data.iloc[:12]
+    filenameParsed = fileNameParser(filename)
+    print("original: ", filename)
+    print("parsed: ", filenameParsed)
+#     data = data.iloc[:]
 
     if not partitionCol:
         partitionCol = data.keys()[0]
     bucketDict = partition(data, numPartition, partitionCol)
-    createFileNodeEntry(filename, path)
-    createDataNode(filename, numPartition)
-    createNameNode(filename, path, numPartition, partitionCol)
+    createFileNodeEntry(filenameParsed, path)
+    createDataNode(filenameParsed, numPartition)
+    createNameNode(filenameParsed, path, numPartition, partitionCol)
     pushDataToDataNode(bucketDict, filename, path)
     logging.info("File successfully uploaded to EDFS")
     print("File successfully added to EDFS")
@@ -236,6 +239,7 @@ def getPartitionLocations(filename, path):
     return : Locations of all partitions
     """
     logging.info("Looking for all partitions in the NameNode")
+    filename = fileNameParser(filename)
     r = requests.get(NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
     locations = r.json()
     print("line 238", locations, NAMENODE + path[1:] + "/" + filename +".json?print=pretty")
@@ -262,7 +266,7 @@ def pushDataToDataNode(data, filename, path):
             r = requests.get(datanode_URI)
             bucketData = []
             if(r.json()):
-                bucketData = r.json()
+                bucketData = list(r.json())
             bucketData.extend(data[int(key[-1])])
 
             d = {filename : bucketData}
@@ -281,7 +285,7 @@ def combineDF(df1, df2):
 
 
 def search(filename, searchColumn, searchQuery):
-    
+    filenameOriginal = filename
     filename = fileNameParser(filename)
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
@@ -289,7 +293,7 @@ def search(filename, searchColumn, searchQuery):
         filePath = filePaths[filename]
         logging.info("File Found")
         file_URI = NAMENODE + filePath
-        locations = getPartitionLocations(filename, filePath)
+        locations = getPartitionLocations(filenameOriginal, filePath)
         if not locations:
             logging.info("Enter the correct column name")
             print("Please enter the correct column  name")
@@ -319,6 +323,7 @@ def search(filename, searchColumn, searchQuery):
 
 def dataAnalytics(filename, column, analyticFunction):
 
+    filenameOriginal = filename
     filename = fileNameParser(filename)
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
@@ -326,7 +331,7 @@ def dataAnalytics(filename, column, analyticFunction):
         filePath = filePaths[filename]
         logging.info("File Found")
         file_URI = NAMENODE + filePath
-        locations = getPartitionLocations(filename, filePath)
+        locations = getPartitionLocations(filenameOriginal, filePath)
         if not locations:
             logging.info("Enter the correct column name")
             print("Please enter the correct column  name")
@@ -384,12 +389,13 @@ def cat(filename, numLines = 5):
     logging.info("Cat function")
     r = requests.get(FILENAME + ".json")
     filePaths = r.json()
+    filenameOriginal = filename
     filename = fileNameParser(filename)
     if(filename in filePaths):
         filePath = filePaths[filename]
         logging.info("File Found")
         file_URI = NAMENODE + filePath
-        locations = getPartitionLocations(filename, filePath)
+        locations = getPartitionLocations(filenameOriginal, filePath)
         partitionColumn = locations['partitionColumn']
         resDF = pd.DataFrame()
         logging.info("Fetching data from all partitions")
@@ -407,7 +413,7 @@ def fileNameParser(filename):
     filename = filename[:-4] + "___csv"
     return filename
 
-# init()
+init()
 # cat("test___csv")
 # dataAnalytics("test.csv", "Age", "range")
 # dataAnalytics("test___csv", "Height", "standardDeviation")
