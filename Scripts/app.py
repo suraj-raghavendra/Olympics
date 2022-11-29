@@ -18,8 +18,8 @@ from map import FIREBASE_URL
 FORMAT = "[%(asctime)s %(filename)s->%(funcName)s():%(lineno)s]%(levelname)s: %(message)s"
 logging.basicConfig(format=FORMAT, level=logging.INFO)
 
-FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
-# FIREBASE_URL = "https://suraj-test-45b9c-default-rtdb.firebaseio.com/"
+# FIREBASE_URL = "https://olympics-62c6a-default-rtdb.firebaseio.com/"
+FIREBASE_URL = "https://dsci-551-17cee-default-rtdb.firebaseio.com/"
 NAMENODE = FIREBASE_URL + "NameNode/root/"
 DATANODE = FIREBASE_URL + "DataNode/root/"
 CURRENT_DIR = "root"
@@ -90,14 +90,42 @@ def cd(directory):
 def pwd(directory):
     pass
 
-def rm(directory):
+def rm(filename):
 #     print(directory)
-    levels = directory.split("/")
-    PWD = NAMENODE
-    for level in levels[1:-1]:
-        PWD = PWD + level + "/"
-    delete_object = requests.delete(PWD + "/.json" )
-    print("Succesfully removed")
+    filenameParsed = fileNameParser(filename)
+    r = requests.get(FILENAME + ".json")
+    filePaths = r.json()
+    logging.info("Remove function")
+    if(filenameParsed in filePaths):
+        filePath = filePaths[filenameParsed]
+        # r = requests.get(NAMENODE + filePath + ".json")
+        # r = r.json()
+        locations = getPartitionLocations(filename, filePath)
+        del locations['k']
+        del locations['partitionColumn']
+        # for partitionNumber, partitionURI in locations.items():
+        #     uriSoftDelete(partitionURI, filenameParsed)
+        uriSoftDelete(NAMENODE + filePath,filenameParsed)  #remove from NameNode
+        # uriSoftDelete(FILENAME , filenameParsed)
+
+    else:
+        print("File Not Found")
+
+
+def uriSoftDelete(uri, filename):
+    r = requests.get(uri + ".json")
+    node = r.json()
+    node[filename] = {}
+    # for key, value in 
+    print(r.json().keys())
+    print(uri)
+    print(node.keys())
+    node = json.dumps(node)
+    r = requests.patch(uri + ".json", data = node)
+
+
+
+
 
 def ls(directory):
 
@@ -219,10 +247,12 @@ def put(path, filename, numPartition, partitionCol = None):
     #To send to partition function
 #     filename = fileNameParser(filename)
     data = pd.read_csv(filename)
+    data = data.iloc[:50] #TO-DO REMOVE
     filenameParsed = fileNameParser(filename)
     print("original: ", filename)
     print("parsed: ", filenameParsed)
 #     data = data.iloc[:]
+    # print(data)
 
     if not partitionCol:
         partitionCol = data.keys()[0]
@@ -256,22 +286,26 @@ def pushDataToDataNode(data, filename, path):
 
     logging.info("Pushing Data to the respective buckets in DataNode")
     locations = getPartitionLocations(filename, path)
+    filenameParsed = fileNameParser(filename)
     del locations['partitionColumn']
     del locations['k']
     for key, value in locations.items():
         if(int(key[-1]) in data):
-            datanode_URI = value + "/" + filename + "/.json"
+            datanode_URI = value + "/" + filenameParsed + "/.json"
             # print(json.dumps(data[int(key[-1])][:2]))
-
+            # print(datanode_URI)
             r = requests.get(datanode_URI)
+            # print("line 298",r.json())
             bucketData = []
             if(r.json()):
-                bucketData = list(r.json())
+                bucketData = r.json()
             bucketData.extend(data[int(key[-1])])
 
-            d = {filename : bucketData}
+            d = {filenameParsed : bucketData}
             d = json.dumps(d)
+
             r = requests.patch(value + ".json", d)
+
   
 def printPartitionLocations(locations):
     """
@@ -439,9 +473,10 @@ def fileNameParser(filename):
     return filename
 
 # init()
+# rm("athlete_events.csv")
 # readPartitionData("athlete_events.csv", "1", "8")
-# cat("test___csv")
-# dataAnalytics("test.csv", "Age", "range")
+# cat("athlete_events.csv",50)
+# dataAnalytics("athlete_events.csv", "Age", "range")
 # dataAnalytics("test___csv", "Height", "standardDeviation")
 # dataAnalytics("test___csv", "Height", "minimum")
 # dataAnalytics("test___csv", "Height", "maximum")
@@ -451,7 +486,7 @@ def fileNameParser(filename):
 # search("test___csv", "Name", "John Aalberg")
 # init()
 # getPartitionLocations("test___csv", "/user/smaran")
-# put("/user/hi", "test___csv", 4, "City")
+# put("/user/hell", "athlete_events.csv", 4)
 # addFileName("cars___csv", 5)
 # while(1):
 
